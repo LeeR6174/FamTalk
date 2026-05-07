@@ -4,10 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, CheckCircle, Target, MessageSquare, Heart, Zap, Save, Loader2, Plus, Trash2 } from 'lucide-react';
 
 const STAGES = [
-  { id: 'praise', title: 'ホメの振り返り', icon: <Heart size={20} /> },
+  { id: 'review', title: '先週の目標の振り返り', icon: <Target size={20} /> },
+  { id: 'next', title: '来週の目標設定', icon: <CheckCircle size={20} /> },
   { id: 'kaizen', title: '改善の振り返り', icon: <Zap size={20} /> },
-  { id: 'review', title: '目標の評価', icon: <Target size={20} /> },
-  { id: 'next', title: '来週の目標設定', icon: <CheckCircle size={20} /> }
+  { id: 'praise', title: 'ホメの振り返り', icon: <Heart size={20} /> }
 ];
 
 export default function MeetingView({ onBack, user }) {
@@ -143,34 +143,8 @@ export default function MeetingView({ onBack, user }) {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
           >
-            {/* ステージ1: ホメ */}
+            {/* ステージ1: 目標評価 */}
             {step === 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {items.filter(i => i.type === 'ホメ').length === 0 ? (
-                  <EmptyState message="今週のホメはありませんでした 🕊️" />
-                ) : (
-                  items.filter(i => i.type === 'ホメ').map(item => (
-                    <ItemCard key={item.id} item={item} onUpdate={handleUpdateAnswer} savingId={savingId} />
-                  ))
-                )}
-              </div>
-            )}
-
-            {/* ステージ2: 改善 */}
-            {step === 1 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {items.filter(i => i.type === '改善').length === 0 ? (
-                  <EmptyState message="今週の改善案はありませんでした ✨" />
-                ) : (
-                  items.filter(i => i.type === '改善').map(item => (
-                    <ItemCard key={item.id} item={item} onUpdate={handleUpdateAnswer} savingId={savingId} />
-                  ))
-                )}
-              </div>
-            )}
-
-            {/* ステージ3: 目標評価 */}
-            {step === 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {goals.length === 0 ? (
                   <EmptyState message="今週設定した目標はありません 🎯" />
@@ -200,8 +174,8 @@ export default function MeetingView({ onBack, user }) {
               </div>
             )}
 
-            {/* ステージ4: 次週目標 */}
-            {step === 3 && (
+            {/* ステージ2: 次週目標 */}
+            {step === 1 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {nextGoals.map((goal, idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -228,6 +202,32 @@ export default function MeetingView({ onBack, user }) {
                 >
                   <Plus size={20} /> 目標を追加
                 </button>
+              </div>
+            )}
+
+            {/* ステージ3: 改善 */}
+            {step === 2 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {items.filter(i => i.type === '改善').length === 0 ? (
+                  <EmptyState message="今週の改善案はありませんでした ✨" />
+                ) : (
+                  items.filter(i => i.type === '改善').map(item => (
+                    <ItemCard key={item.id} item={item} onUpdate={handleUpdateAnswer} savingId={savingId} />
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ステージ4: ホメ */}
+            {step === 3 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {items.filter(i => i.type === 'ホメ').length === 0 ? (
+                  <EmptyState message="今週のホメはありませんでした 🕊️" />
+                ) : (
+                  items.filter(i => i.type === 'ホメ').map(item => (
+                    <ItemCard key={item.id} item={item} onUpdate={handleUpdateAnswer} savingId={savingId} />
+                  ))
+                )}
               </div>
             )}
           </motion.div>

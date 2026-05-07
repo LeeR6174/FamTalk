@@ -1,4 +1,4 @@
-import { getCurrentGoals, updateGoal } from '@/lib/notion';
+import { getCurrentGoals, createGoal } from '@/lib/notion';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -14,10 +14,10 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const result = await updateGoal(body.content);
+    const result = await createGoal(body.content);
     return NextResponse.json(result);
   } catch (error) {
     console.error('Notion API Error:', error);
-    return NextResponse.json({ error: 'Failed to update goal' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 });
   }
 }
