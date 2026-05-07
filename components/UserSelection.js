@@ -19,8 +19,8 @@ export default function UserSelection({ onSelect }) {
         <h1 className="header-title" style={{ fontSize: '32px', marginBottom: '8px', color: 'var(--text-dark)' }}>
           FamTalk
         </h1>
-        <p style={{ color: 'var(--text-light)', marginBottom: '48px' }}>
-          どちらでログインしますか？ ✨
+        <p style={{ color: 'var(--text-light)', marginBottom: '48px', fontWeight: 500 }}>
+          Welcome back
         </p>
       </motion.div>
 
@@ -98,14 +98,6 @@ export default function UserSelection({ onSelect }) {
         </motion.button>
       </div>
       
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1 }}
-        style={{ marginTop: '48px', fontSize: '14px', color: 'var(--text-light)' }}
-      >
-        家族のコミュニケーションを楽しく 🛋️
-      </motion.div>
     </div>
   );
 }

@@ -1,13 +1,13 @@
-import { getCurrentGoal, updateGoal } from '@/lib/notion';
+import { getCurrentGoals, updateGoal } from '@/lib/notion';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const goal = await getCurrentGoal();
-    return NextResponse.json(goal);
+    const goals = await getCurrentGoals();
+    return NextResponse.json(goals || []);
   } catch (error) {
     console.error('Notion API Error:', error);
-    return NextResponse.json({ error: 'Failed to fetch goal' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch goals' }, { status: 500 });
   }
 }
 

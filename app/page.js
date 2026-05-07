@@ -131,9 +131,21 @@ export default function Home() {
           <span style={{ fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>This Week's Goal</span>
         </div>
         {loading ? (
-          <div className="skeleton" style={{ height: '32px', width: '90%', opacity: 0.2, borderRadius: '8px' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="skeleton" style={{ height: '24px', width: '90%', opacity: 0.2, borderRadius: '8px' }} />
+            <div className="skeleton" style={{ height: '24px', width: '70%', opacity: 0.2, borderRadius: '8px' }} />
+          </div>
+        ) : currentGoal && currentGoal.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {currentGoal.map((goal, idx) => (
+              <div key={goal.id} style={{ display: 'flex', gap: '10px', alignItems: 'start' }}>
+                <div style={{ fontSize: '18px', marginTop: '2px' }}>🎯</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, lineHeight: 1.4 }}>{goal.content}</div>
+              </div>
+            ))}
+          </div>
         ) : (
-          <h2 style={{ fontSize: '24px', fontWeight: 800, lineHeight: 1.3 }}>{currentGoal?.content || '目標を立てましょう！'}</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: 800 }}>今週の目標を立てましょう！</h2>
         )}
       </motion.div>
 

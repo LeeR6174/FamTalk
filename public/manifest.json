@@ -1,7 +1,7 @@
 {
   "name": "FamTalk",
   "short_name": "FamTalk",
-  "description": "家族会議の運営をサポートするアプリ",
+  "description": "Family Meeting Helper",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
