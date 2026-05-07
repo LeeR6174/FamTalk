@@ -97,7 +97,17 @@ export default function MeetingView({ onBack, user }) {
     </div>
   );
 
+  const calculateMeetingCount = () => {
+    const baselineDate = new Date('2026-05-09');
+    const baselineCount = 63;
+    const today = new Date();
+    const diffTime = today - baselineDate;
+    const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
+    return baselineCount + diffWeeks;
+  };
+
   const currentStage = STAGES[step];
+  const meetingCount = calculateMeetingCount();
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', minHeight: '85vh' }}>
@@ -112,7 +122,7 @@ export default function MeetingView({ onBack, user }) {
         </motion.button>
         <div>
           <div style={{ fontSize: '12px', color: 'var(--text-light)', fontWeight: 600, textTransform: 'uppercase' }}>
-            STEP {step + 1} OF 4
+            第{meetingCount}回 家族会議 • STEP {step + 1} OF 4
           </div>
           <h2 style={{ fontSize: '22px', fontWeight: 800 }}>{currentStage.title}</h2>
         </div>
