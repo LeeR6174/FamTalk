@@ -4,7 +4,7 @@ import { X, Calendar, Bug, Info } from 'lucide-react';
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
-export default function Settings({ onClose, meetingDay, setMeetingDay, devMode, setDevMode }) {
+export default function Settings({ onClose, user, meetingDay, setMeetingDay, devMode, setDevMode }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -115,6 +115,39 @@ export default function Settings({ onClose, meetingDay, setMeetingDay, devMode, 
             <div>
               設定はブラウザに保存されます。家族で共有する場合は、それぞれの端末で設定してください。
             </div>
+          </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid rgba(0,0,0,0.05)' }} />
+
+          {/* フィードバックフォーム */}
+          <div>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-light)', marginBottom: '16px', display: 'block' }}>
+              開発者へ意見を送る 💌
+            </label>
+            <form 
+              name="contact" 
+              method="POST" 
+              data-netlify="true"
+              style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+            >
+              <input type="hidden" name="form-name" value="contact" />
+              
+              <textarea 
+                name="message" 
+                placeholder="改善案や応援メッセージをお願いします！" 
+                required
+                className="input"
+                style={{ height: '80px', fontSize: '14px', padding: '12px' }}
+              />
+
+              <button 
+                type="submit" 
+                className="btn btn-primary"
+                style={{ padding: '12px', fontSize: '14px', fontWeight: 700 }}
+              >
+                送信する
+              </button>
+            </form>
           </div>
         </div>
       </motion.div>

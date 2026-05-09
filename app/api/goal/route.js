@@ -14,7 +14,10 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const result = await createGoal(body.content);
+    const result = await createGoal({ 
+      content: body.content, 
+      from: body.user || 'Unknown' 
+    });
     return NextResponse.json(result);
   } catch (error) {
     console.error('Notion API Error:', error);

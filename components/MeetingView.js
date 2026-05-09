@@ -105,7 +105,7 @@ export default function MeetingView({ onBack, user }) {
         fetch('/api/goal', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({ content, user }),
         })
       ));
       setIsFinished(true);

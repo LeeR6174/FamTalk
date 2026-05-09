@@ -10,6 +10,7 @@ import { Target, Settings as SettingsIcon, LogOut, Loader2 } from 'lucide-react'
 export default function Home() {
   const [user, setUser] = useState(null);
   const [isMeetingMode, setIsMeetingMode] = useState(false);
+  const [prevMeetingMode, setPrevMeetingMode] = useState(false);
   const [meetingDay, setMeetingDay] = useState(6); // Default Saturday
   const [devMode, setDevMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -38,6 +39,14 @@ export default function Home() {
       localStorage.setItem('famtalk_dev_mode', devMode);
     }
   }, [meetingDay, devMode, isConfigLoaded]);
+
+  // 会議終了後に目標を再取得
+  useEffect(() => {
+    if (prevMeetingMode === true && isMeetingMode === false) {
+      fetchGoal();
+    }
+    setPrevMeetingMode(isMeetingMode);
+  }, [isMeetingMode, prevMeetingMode]);
 
   const fetchGoal = async () => {
     try {
@@ -138,9 +147,18 @@ export default function Home() {
         ) : currentGoal && currentGoal.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {currentGoal.map((goal, idx) => (
-              <div key={goal.id} style={{ display: 'flex', gap: '10px', alignItems: 'start' }}>
-                <div style={{ fontSize: '18px', marginTop: '2px' }}>🎯</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, lineHeight: 1.4 }}>{goal.content}</div>
+              <div key={goal.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'start' }}>
+                  <div style={{ fontSize: '18px', marginTop: '2px' }}>🎯</div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 800, lineHeight: 1.4 }}>{goal.content}</div>
+                    {goal.from && (
+                      <div style={{ fontSize: '11px', fontWeight: 600, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        By {goal.from}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -203,6 +221,7 @@ export default function Home() {
         {showSettings && (
           <Settings 
             onClose={() => setShowSettings(false)}
+            user={user}
             meetingDay={meetingDay}
             setMeetingDay={setMeetingDay}
             devMode={devMode}
