@@ -1,13 +1,13 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, CheckCircle, Target, MessageSquare, Heart, Zap, Save, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, Target, MessageSquare, Heart, Zap, Save, Loader2, Plus, Trash2, PartyPopper } from 'lucide-react';
 
 const STAGES = [
-  { id: 'review', title: '先週の目標の振り返り', icon: <Target size={20} /> },
-  { id: 'next', title: '来週の目標設定', icon: <CheckCircle size={20} /> },
-  { id: 'kaizen', title: '改善の振り返り', icon: <Zap size={20} /> },
-  { id: 'praise', title: 'ホメの振り返り', icon: <Heart size={20} /> }
+  { id: 'review', title: '先週の振り返り', icon: <Target size={20} /> },
+  { id: 'next', title: '来週の目標を作成', icon: <CheckCircle size={20} /> },
+  { id: 'kaizen', title: '改善してほしいこと', icon: <Zap size={20} /> },
+  { id: 'praise', title: 'ホメ', icon: <Heart size={20} /> }
 ];
 
 export default function MeetingView({ onBack, user }) {
@@ -17,13 +17,22 @@ export default function MeetingView({ onBack, user }) {
   const [nextGoals, setNextGoals] = useState(['']);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
+  const [isFinished, setIsFinished] = useState(false);
+  const [showCutIn, setShowCutIn] = useState(true);
 
-  useEffect(() => {
-    fetchData();
+  const calculateMeetingCount = useCallback(() => {
+    const baselineDate = new Date('2026-05-09');
+    const baselineCount = 63;
+    const today = new Date();
+    const diffTime = today - baselineDate;
+    const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
+    return baselineCount + diffWeeks;
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const meetingNumber = calculateMeetingCount();
+
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [itemsRes, goalRes] = await Promise.all([
         fetch('/api/items'),
@@ -36,9 +45,24 @@ export default function MeetingView({ onBack, user }) {
     } catch (error) {
       console.error(error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+    const timer = setInterval(fetchData, 10000);
+    
+    // 2秒後にカットインを非表示にする
+    const cutInTimer = setTimeout(() => {
+      setShowCutIn(false);
+    }, 2500);
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(cutInTimer);
+    };
+  }, []);
 
   const handleUpdateAnswer = async (id, answer, isGoal = false) => {
     setSavingId(id);
@@ -49,9 +73,9 @@ export default function MeetingView({ onBack, user }) {
         body: JSON.stringify({ id, answer }),
       });
       if (isGoal) {
-        setGoals(goals.map(g => g.id === id ? { ...g, answer } : g));
+        setGoals(prev => prev.map(g => g.id === id ? { ...g, answer } : g));
       } else {
-        setItems(items.map(item => item.id === id ? { ...item, answer } : item));
+        setItems(prev => prev.map(item => item.id === id ? { ...item, answer } : item));
       }
     } catch (error) {
       console.error(error);
@@ -70,7 +94,10 @@ export default function MeetingView({ onBack, user }) {
 
   const handleSaveAllGoals = async () => {
     const validGoals = nextGoals.filter(g => g.trim() !== '');
-    if (validGoals.length === 0) return;
+    if (validGoals.length === 0) {
+      setIsFinished(true);
+      return;
+    }
     
     setLoading(true);
     try {
@@ -81,7 +108,7 @@ export default function MeetingView({ onBack, user }) {
           body: JSON.stringify({ content }),
         })
       ));
-      onBack();
+      setIsFinished(true);
     } catch (error) {
       console.error(error);
       alert('目標の保存に失敗しました');
@@ -90,6 +117,68 @@ export default function MeetingView({ onBack, user }) {
     }
   };
 
+  if (showCutIn) {
+    return (
+      <AnimatePresence>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 1.2, filter: 'blur(10px)' }}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+          style={{ 
+            background: 'linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)',
+            color: 'white',
+            textAlign: 'center'
+          }}
+        >
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <span style={{ fontSize: '24px', fontWeight: 600, opacity: 0.8, letterSpacing: '4px' }}>FAMTALK</span>
+            <h1 style={{ fontSize: '64px', fontWeight: 900, margin: '20px 0', textShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+              第 {meetingNumber} 回<br />家族会議
+            </h1>
+            <motion.div 
+              animate={{ width: ['0%', '100%'] }}
+              transition={{ duration: 1.5, ease: 'easeInOut' }}
+              style={{ height: '4px', background: 'white', borderRadius: '2px', margin: '0 auto', maxWidth: '300px' }} 
+            />
+            <p style={{ marginTop: '20px', fontSize: '18px', fontWeight: 500 }}>スタート！ 🚀</p>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
+  if (isFinished) {
+    return (
+      <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', textAlign: 'center' }}>
+        <motion.div
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", damping: 12 }}
+        >
+          <div style={{ width: '80px', height: '80px', background: 'var(--primary)', borderRadius: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', marginBottom: '32px', margin: '0 auto 32px' }}>
+            <PartyPopper size={40} />
+          </div>
+          <h2 style={{ fontSize: '28px', fontWeight: 800, marginBottom: '16px' }}>会議お疲れ様でした！</h2>
+          <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--primary)', marginBottom: '48px' }}>
+            来週も一緒に頑張ろう！
+          </p>
+          <button 
+            className="btn btn-primary" 
+            style={{ padding: '16px 32px', borderRadius: '16px' }}
+            onClick={onBack}
+          >
+            ホームに戻る
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (loading && items.length === 0 && goals.length === 0) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '16px' }}>
       <Loader2 className="animate-spin" size={48} color="var(--primary)" />
@@ -97,17 +186,7 @@ export default function MeetingView({ onBack, user }) {
     </div>
   );
 
-  const calculateMeetingCount = () => {
-    const baselineDate = new Date('2026-05-09');
-    const baselineCount = 63;
-    const today = new Date();
-    const diffTime = today - baselineDate;
-    const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
-    return baselineCount + diffWeeks;
-  };
-
   const currentStage = STAGES[step];
-  const meetingCount = calculateMeetingCount();
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', minHeight: '85vh' }}>
@@ -122,7 +201,7 @@ export default function MeetingView({ onBack, user }) {
         </motion.button>
         <div>
           <div style={{ fontSize: '12px', color: 'var(--text-light)', fontWeight: 600, textTransform: 'uppercase' }}>
-            第{meetingCount}回 家族会議 • STEP {step + 1} OF 4
+            第{meetingNumber}回 家族会議 • STEP {step + 1} OF 4
           </div>
           <h2 style={{ fontSize: '22px', fontWeight: 800 }}>{currentStage.title}</h2>
         </div>
@@ -153,13 +232,13 @@ export default function MeetingView({ onBack, user }) {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
           >
-            {/* ステージ1: 目標評価 */}
+            {/* ステージ1: 先週の振り返り */}
             {step === 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {goals.length === 0 ? (
-                  <EmptyState message="今週設定した目標はありません 🎯" />
+                {goals.filter(g => g.date !== new Date().toISOString().split('T')[0]).length === 0 ? (
+                  <EmptyState message="振り返る目標がありません 🎯" />
                 ) : (
-                  goals.map(goal => (
+                  goals.filter(g => g.date !== new Date().toISOString().split('T')[0]).map(goal => (
                     <div key={goal.id} className="glass-card" style={{ background: 'white', padding: '20px' }}>
                       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
                         <Target size={24} color="var(--primary)" style={{ flexShrink: 0 }} />
@@ -184,9 +263,10 @@ export default function MeetingView({ onBack, user }) {
               </div>
             )}
 
-            {/* ステージ2: 次週目標 */}
+            {/* ステージ2: 来週の目標 */}
             {step === 1 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <p style={{ fontSize: '14px', color: 'var(--text-light)', marginBottom: '8px' }}>来週の目標を立てましょう！</p>
                 {nextGoals.map((goal, idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <input 
@@ -215,7 +295,7 @@ export default function MeetingView({ onBack, user }) {
               </div>
             )}
 
-            {/* ステージ3: 改善 */}
+            {/* ステージ3: 改善してほしいこと */}
             {step === 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {items.filter(i => i.type === '改善').length === 0 ? (
@@ -257,7 +337,7 @@ export default function MeetingView({ onBack, user }) {
         ) : (
           <button 
             onClick={handleSaveAllGoals}
-            disabled={loading || nextGoals.every(g => !g.trim())}
+            disabled={loading}
             className="btn btn-accent"
             style={{ width: '100%', padding: '18px', fontSize: '18px' }}
           >
@@ -276,8 +356,8 @@ function ItemCard({ item, onUpdate, savingId }) {
         <span className={`badge ${item.type === 'ホメ' ? 'badge-home' : 'badge-kaizen'}`}>
           {item.type}
         </span>
-        <span style={{ fontSize: '13px', color: 'var(--text-light)', fontWeight: 500 }}>
-          {item.from} → {item.to}
+        <span style={{ fontSize: '13px', color: 'var(--text-light)', fontWeight: 600 }}>
+          {item.from} → <span style={{ color: 'var(--primary)', fontWeight: 800 }}>{item.to}</span>
         </span>
       </div>
       <p style={{ fontSize: '17px', marginBottom: '16px', fontWeight: 500, lineHeight: 1.5 }}>{item.content}</p>
