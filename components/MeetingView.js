@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, CheckCircle, Target, MessageSquare, Heart, Zap, Save, Loader2, Plus, Trash2, PartyPopper } from 'lucide-react';
 
@@ -32,6 +32,14 @@ export default function MeetingView({ onBack, user }) {
   const meetingNumber = calculateMeetingCount();
 
   const fetchData = useCallback(async (silent = false) => {
+    // 入力中はバックグラウンド更新をスキップ（カーソル飛び防止）
+    if (silent && (
+      document.activeElement?.tagName === 'INPUT' || 
+      document.activeElement?.tagName === 'TEXTAREA'
+    )) {
+      return;
+    }
+
     if (!silent) setLoading(true);
     try {
       const [itemsRes, goalRes] = await Promise.all([
@@ -349,7 +357,7 @@ export default function MeetingView({ onBack, user }) {
   );
 }
 
-function ItemCard({ item, onUpdate, savingId }) {
+const ItemCard = memo(({ item, onUpdate, savingId }) => {
   return (
     <div className="glass-card" style={{ padding: '20px', background: 'white' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -375,12 +383,12 @@ function ItemCard({ item, onUpdate, savingId }) {
       </div>
     </div>
   );
-}
+});
 
-function EmptyState({ message }) {
+const EmptyState = memo(({ message }) => {
   return (
     <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-light)', border: '2px dashed rgba(0,0,0,0.05)', borderRadius: '24px' }}>
       <p style={{ fontSize: '16px' }}>{message}</p>
     </div>
   );
-}
+});
