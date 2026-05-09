@@ -136,7 +136,7 @@ export default function MeetingView({ onBack, user }) {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-            <span style={{ fontSize: '24px', fontWeight: 600, opacity: 0.8, letterSpacing: '4px' }}>FAMTALK</span>
+            <span style={{ fontSize: '24px', fontWeight: 600, opacity: 0.8, letterSpacing: '4px' }}>ファムトーク</span>
             <h1 style={{ fontSize: '64px', fontWeight: 900, margin: '20px 0', textShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
               第 {meetingNumber} 回<br />家族会議
             </h1>
@@ -201,7 +201,7 @@ export default function MeetingView({ onBack, user }) {
         </motion.button>
         <div>
           <div style={{ fontSize: '12px', color: 'var(--text-light)', fontWeight: 600, textTransform: 'uppercase' }}>
-            第{meetingNumber}回 家族会議 • STEP {step + 1} OF 4
+            第{meetingNumber}回 家族会議 • ステップ {step + 1} / 4
           </div>
           <h2 style={{ fontSize: '22px', fontWeight: 800 }}>{currentStage.title}</h2>
         </div>

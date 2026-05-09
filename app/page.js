@@ -99,7 +99,7 @@ export default function Home() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
           <h1 className="header-title" style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-dark)' }}>FamTalk</h1>
-          <p style={{ color: 'var(--text-light)', fontSize: '14px', fontWeight: 500 }}>Hello, {user} ✨</p>
+          <p style={{ color: 'var(--text-light)', fontSize: '14px', fontWeight: 500 }}>こんにちは、{user}さん ✨</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <motion.button 
@@ -137,7 +137,7 @@ export default function Home() {
           <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '10px' }}>
             <Target size={20} />
           </div>
-          <span style={{ fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>This Week's Goal</span>
+          <span style={{ fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>今週の目標</span>
         </div>
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -145,22 +145,25 @@ export default function Home() {
             <div className="skeleton" style={{ height: '24px', width: '70%', opacity: 0.2, borderRadius: '8px' }} />
           </div>
         ) : currentGoal && currentGoal.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {currentGoal.map((goal, idx) => (
-              <div key={goal.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'start' }}>
-                  <div style={{ fontSize: '18px', marginTop: '2px' }}>🎯</div>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ fontSize: '18px', fontWeight: 800, lineHeight: 1.4 }}>{goal.content}</div>
-                    {goal.from && (
-                      <div style={{ fontSize: '11px', fontWeight: 600, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        By {goal.from}
-                      </div>
-                    )}
+          <div style={{ display: 'grid', gridTemplateColumns: currentGoal.length > 1 ? '1fr 1fr' : '1fr', gap: '20px' }}>
+            {['あき', 'ゆうき'].map(name => {
+              const userGoals = currentGoal.filter(g => g.from === name || (!g.from && name === 'あき')); // Fallback for old data
+              if (userGoals.length === 0) return null;
+              
+              return (
+                <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.1)', padding: '16px', borderRadius: '16px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 800, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                    {name === 'あき' ? 'あきの目標' : 'ゆうきの目標'}
                   </div>
+                  {userGoals.map(goal => (
+                    <div key={goal.id} style={{ display: 'flex', gap: '8px', alignItems: 'start' }}>
+                      <div style={{ fontSize: '16px' }}>🎯</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, lineHeight: 1.3 }}>{goal.content}</div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <h2 style={{ fontSize: '20px', fontWeight: 800 }}>今週の目標を立てましょう！</h2>
