@@ -16,7 +16,8 @@ export async function POST(request) {
     const body = await request.json();
     const result = await createGoal({ 
       content: body.content, 
-      from: body.user || 'Unknown' 
+      from: body.user || 'Unknown',
+      date: body.date
     });
     return NextResponse.json(result);
   } catch (error) {

@@ -10,7 +10,7 @@ const STAGES = [
   { id: 'praise', title: 'ホメ', icon: <Heart size={20} /> }
 ];
 
-export default function MeetingView({ onBack, user }) {
+export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
   const [step, setStep] = useState(0);
   const [items, setItems] = useState([]);
   const [goals, setGoals] = useState([]);
@@ -26,10 +26,30 @@ export default function MeetingView({ onBack, user }) {
     const today = new Date();
     const diffTime = today - baselineDate;
     const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
-    return baselineCount + diffWeeks;
-  }, []);
+    return baselineCount + diffWeeks - meetingOffset;
+  }, [meetingOffset]);
 
   const meetingNumber = calculateMeetingCount();
+
+  const getMeetingPeriod = useCallback((number) => {
+    const baselineDate = new Date('2026-05-09');
+    const baselineCount = 63;
+    const offsetWeeks = number - baselineCount;
+    const meetingDate = new Date(baselineDate.getTime() + offsetWeeks * 7 * 24 * 60 * 60 * 1000);
+    const startDate = new Date(meetingDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const endDate = new Date(meetingDate.getTime() - 1 * 24 * 60 * 60 * 1000);
+    
+    const formatDate = (d) => {
+      const month = d.getMonth() + 1;
+      const date = d.getDate();
+      const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+      return `${month}/${date}(${dayOfWeek})`;
+    };
+    
+    return `${formatDate(startDate)} 〜 ${formatDate(endDate)}`;
+  }, []);
+
+  const meetingPeriod = getMeetingPeriod(meetingNumber);
 
   const fetchData = useCallback(async (silent = false) => {
     // 入力中はバックグラウンド更新をスキップ（カーソル飛び防止）
@@ -58,7 +78,9 @@ export default function MeetingView({ onBack, user }) {
   }, []);
 
   useEffect(() => {
-    fetchData();
+    Promise.resolve().then(() => {
+      fetchData();
+    });
     const timer = setInterval(fetchData, 10000);
     
     // 2秒後にカットインを非表示にする
@@ -70,7 +92,7 @@ export default function MeetingView({ onBack, user }) {
       clearInterval(timer);
       clearTimeout(cutInTimer);
     };
-  }, []);
+  }, [fetchData]);
 
   const handleUpdateAnswer = async (id, answer, isGoal = false) => {
     setSavingId(id);
@@ -109,11 +131,12 @@ export default function MeetingView({ onBack, user }) {
     
     setLoading(true);
     try {
+      const goalDate = new Date(Date.now() - meetingOffset * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       await Promise.all(validGoals.map(content => 
         fetch('/api/goal', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, user }),
+          body: JSON.stringify({ content, user, date: goalDate }),
         })
       ));
       setIsFinished(true);
@@ -148,6 +171,9 @@ export default function MeetingView({ onBack, user }) {
             <h1 style={{ fontSize: '64px', fontWeight: 900, margin: '20px 0', textShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
               第 {meetingNumber} 回<br />家族会議
             </h1>
+            <span style={{ fontSize: '18px', fontWeight: 600, opacity: 0.9, display: 'block', marginTop: '-10px', marginBottom: '20px' }}>
+              対象期間: {meetingPeriod}
+            </span>
             <motion.div 
               animate={{ width: ['0%', '100%'] }}
               transition={{ duration: 1.5, ease: 'easeInOut' }}
@@ -209,7 +235,7 @@ export default function MeetingView({ onBack, user }) {
         </motion.button>
         <div>
           <div style={{ fontSize: '12px', color: 'var(--text-light)', fontWeight: 600, textTransform: 'uppercase' }}>
-            第{meetingNumber}回 家族会議 • ステップ {step + 1} / 4
+            第{meetingNumber}回 家族会議 ({meetingPeriod}) • ステップ {step + 1} / 4
           </div>
           <h2 style={{ fontSize: '22px', fontWeight: 800 }}>{currentStage.title}</h2>
         </div>
@@ -306,6 +332,12 @@ export default function MeetingView({ onBack, user }) {
             {/* ステージ3: 改善してほしいこと */}
             {step === 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <AddMeetingItemForm 
+                  type="改善" 
+                  user={user} 
+                  meetingOffset={meetingOffset} 
+                  onItemAdded={(newItem) => setItems(prev => [...prev, newItem])} 
+                />
                 {items.filter(i => i.type === '改善').length === 0 ? (
                   <EmptyState message="今週の改善案はありませんでした ✨" />
                 ) : (
@@ -319,6 +351,12 @@ export default function MeetingView({ onBack, user }) {
             {/* ステージ4: ホメ */}
             {step === 3 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <AddMeetingItemForm 
+                  type="ホメ" 
+                  user={user} 
+                  meetingOffset={meetingOffset} 
+                  onItemAdded={(newItem) => setItems(prev => [...prev, newItem])} 
+                />
                 {items.filter(i => i.type === 'ホメ').length === 0 ? (
                   <EmptyState message="今週のホメはありませんでした 🕊️" />
                 ) : (
@@ -357,6 +395,74 @@ export default function MeetingView({ onBack, user }) {
   );
 }
 
+const AddMeetingItemForm = memo(({ type, user, meetingOffset, onItemAdded }) => {
+  const [content, setContent] = useState('');
+  const [loading, setLoading] = useState(false);
+  const to = user === 'あき' ? 'ゆうき' : 'あき';
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!content.trim()) return;
+
+    setLoading(true);
+    try {
+      const itemDate = new Date(Date.now() - meetingOffset * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const res = await fetch('/api/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, type, from: user, to, date: itemDate }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setContent('');
+        const newItem = {
+          id: data.id,
+          content: content,
+          type: type,
+          from: user,
+          to: to,
+          date: itemDate,
+          answer: ''
+        };
+        onItemAdded(newItem);
+      } else {
+        alert('追加に失敗しました。');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('エラーが発生しました。');
+    } finally {
+      setContent('');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="glass-card" style={{ padding: '16px 20px', background: 'rgba(255, 255, 255, 0.65)', border: '2px dashed rgba(33, 150, 243, 0.25)', marginBottom: '16px', boxShadow: 'none' }}>
+      <h5 style={{ fontSize: '13px', fontWeight: 800, marginBottom: '12px', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        会議中に追加で書き込む 📝
+      </h5>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px' }}>
+        <input
+          className="input"
+          style={{ padding: '10px 14px', fontSize: '14px', flex: 1, borderRadius: '12px', background: 'white' }}
+          placeholder={`${to}への${type}...`}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+        />
+        <button
+          type="submit"
+          className="btn btn-primary"
+          style={{ padding: '10px 18px', fontSize: '14px', borderRadius: '12px', minWidth: '70px', height: '40px' }}
+          disabled={loading || !content.trim()}
+        >
+          {loading ? <Loader2 className="animate-spin" size={16} /> : '追加'}
+        </button>
+      </form>
+    </div>
+  );
+});
+
 const ItemCard = memo(({ item, onUpdate, savingId }) => {
   return (
     <div className="glass-card" style={{ padding: '20px', background: 'white' }}>
@@ -392,3 +498,7 @@ const EmptyState = memo(({ message }) => {
     </div>
   );
 });
+
+AddMeetingItemForm.displayName = 'AddMeetingItemForm';
+ItemCard.displayName = 'ItemCard';
+EmptyState.displayName = 'EmptyState';

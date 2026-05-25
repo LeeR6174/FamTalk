@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import UserSelection from '@/components/UserSelection';
 import QuickPost from '@/components/QuickPost';
 import MeetingView from '@/components/MeetingView';
@@ -17,6 +17,19 @@ export default function Home() {
   const [currentGoal, setCurrentGoal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+  const [meetingOffset, setMeetingOffset] = useState(0);
+
+  const fetchGoal = useCallback(async () => {
+    try {
+      const res = await fetch('/api/goal');
+      const data = await res.json();
+      setCurrentGoal(data?.error ? null : data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     // Load config from LocalStorage
@@ -24,13 +37,14 @@ export default function Home() {
     const savedDay = localStorage.getItem('famtalk_meeting_day');
     const savedDevMode = localStorage.getItem('famtalk_dev_mode');
 
-    if (savedUser) setUser(savedUser);
-    if (savedDay !== null) setMeetingDay(parseInt(savedDay));
-    if (savedDevMode === 'true') setDevMode(true);
-    
-    setIsConfigLoaded(true);
-    fetchGoal();
-  }, []);
+    Promise.resolve().then(() => {
+      if (savedUser) setUser(savedUser);
+      if (savedDay !== null) setMeetingDay(parseInt(savedDay));
+      if (savedDevMode === 'true') setDevMode(true);
+      setIsConfigLoaded(true);
+      fetchGoal();
+    });
+  }, [fetchGoal]);
 
   // Save config when changed
   useEffect(() => {
@@ -43,22 +57,14 @@ export default function Home() {
   // 会議終了後に目標を再取得
   useEffect(() => {
     if (prevMeetingMode === true && isMeetingMode === false) {
-      fetchGoal();
+      Promise.resolve().then(() => {
+        fetchGoal();
+      });
     }
-    setPrevMeetingMode(isMeetingMode);
-  }, [isMeetingMode, prevMeetingMode]);
-
-  const fetchGoal = async () => {
-    try {
-      const res = await fetch('/api/goal');
-      const data = await res.json();
-      setCurrentGoal(data?.error ? null : data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    Promise.resolve().then(() => {
+      setPrevMeetingMode(isMeetingMode);
+    });
+  }, [isMeetingMode, prevMeetingMode, fetchGoal]);
 
   const handleUserSelect = (selectedUser) => {
     localStorage.setItem('famtalk_user', selectedUser);
@@ -88,7 +94,7 @@ export default function Home() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
         >
-          <MeetingView onBack={() => setIsMeetingMode(false)} user={user} />
+          <MeetingView onBack={() => setIsMeetingMode(false)} user={user} meetingOffset={meetingOffset} />
         </motion.div>
       </AnimatePresence>
     );
@@ -194,9 +200,32 @@ export default function Home() {
                   background: 'linear-gradient(135deg, var(--primary), #ec407a)',
                   boxShadow: '0 15px 35px rgba(244, 143, 177, 0.4)'
                 }}
-                onClick={() => setIsMeetingMode(true)}
+                onClick={() => {
+                  setMeetingOffset(0);
+                  setIsMeetingMode(true);
+                }}
               >
                 家族会議をはじめる 🚀
+              </button>
+              <button 
+                className="btn" 
+                style={{ 
+                  width: '100%', 
+                  marginTop: '12px',
+                  padding: '14px', 
+                  borderRadius: '18px', 
+                  fontSize: '14px', 
+                  fontWeight: 700,
+                  background: 'rgba(0,0,0,0.05)',
+                  color: 'var(--text-light)',
+                  boxShadow: 'none'
+                }}
+                onClick={() => {
+                  setMeetingOffset(1);
+                  setIsMeetingMode(true);
+                }}
+              >
+                前回の分の会議を行う ⏳
               </button>
             </motion.div>
           ) : (
@@ -215,6 +244,25 @@ export default function Home() {
               }}
             >
               次の会議は {['日', '月', '火', '水', '木', '金', '土'][meetingDay]}曜日 です 🛋️
+              <button 
+                className="btn btn-secondary" 
+                style={{ 
+                  width: '100%', 
+                  marginTop: '16px',
+                  padding: '16px', 
+                  borderRadius: '18px', 
+                  fontSize: '16px', 
+                  fontWeight: 800,
+                  background: 'linear-gradient(135deg, var(--secondary), #42a5f5)',
+                  boxShadow: '0 8px 20px rgba(144, 202, 249, 0.3)'
+                }}
+                onClick={() => {
+                  setMeetingOffset(1);
+                  setIsMeetingMode(true);
+                }}
+              >
+                前回の分の会議を行う ⏳
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
