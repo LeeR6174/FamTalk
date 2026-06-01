@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, CheckCircle, Target, MessageSquare, Heart, Zap, Save, Loader2, Plus, Trash2, PartyPopper } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, Target, MessageSquare, Heart, Zap, Save, Loader2, Plus, Trash2, PartyPopper, RefreshCw } from 'lucide-react';
 
 const STAGES = [
   { id: 'review', title: '先週の振り返り', icon: <Target size={20} /> },
@@ -51,6 +51,25 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
 
   const meetingPeriod = getMeetingPeriod(meetingNumber);
 
+  const getMeetingQueryDates = useCallback(() => {
+    const toISODate = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const date = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${date}`;
+    };
+
+    const end = new Date(Date.now() - meetingOffset * 7 * 24 * 60 * 60 * 1000);
+    const start = new Date(Date.now() - (meetingOffset + 1) * 7 * 24 * 60 * 60 * 1000);
+
+    return {
+      startDate: toISODate(start),
+      endDate: toISODate(end)
+    };
+  }, [meetingOffset]);
+
+  const { startDate, endDate } = getMeetingQueryDates();
+
   const fetchData = useCallback(async (silent = false) => {
     // 入力中はバックグラウンド更新をスキップ（カーソル飛び防止）
     if (silent && (
@@ -62,9 +81,10 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
 
     if (!silent) setLoading(true);
     try {
+      const { startDate, endDate } = getMeetingQueryDates();
       const [itemsRes, goalRes] = await Promise.all([
-        fetch('/api/items'),
-        fetch('/api/goal'),
+        fetch(`/api/items?startDate=${startDate}&endDate=${endDate}`),
+        fetch(`/api/goal?startDate=${startDate}&endDate=${endDate}`),
       ]);
       const itemsData = await itemsRes.json();
       const goalData = await goalRes.json();
@@ -75,13 +95,12 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [getMeetingQueryDates]);
 
   useEffect(() => {
     Promise.resolve().then(() => {
       fetchData();
     });
-    const timer = setInterval(fetchData, 10000);
     
     // 2秒後にカットインを非表示にする
     const cutInTimer = setTimeout(() => {
@@ -89,7 +108,6 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
     }, 2500);
 
     return () => {
-      clearInterval(timer);
       clearTimeout(cutInTimer);
     };
   }, [fetchData]);
@@ -224,21 +242,48 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', minHeight: '85vh' }}>
-      <header style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
-        <motion.button 
-          whileTap={{ scale: 0.9 }}
-          onClick={step === 0 ? onBack : () => setStep(step - 1)} 
-          className="btn" 
-          style={{ padding: '10px', borderRadius: '50%', background: 'white', minWidth: '44px' }}
-        >
-          <ChevronLeft size={24} />
-        </motion.button>
-        <div>
-          <div style={{ fontSize: '12px', color: 'var(--text-light)', fontWeight: 600, textTransform: 'uppercase' }}>
-            第{meetingNumber}回 家族会議 ({meetingPeriod}) • ステップ {step + 1} / 4
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <motion.button 
+            whileTap={{ scale: 0.9 }}
+            onClick={step === 0 ? onBack : () => setStep(step - 1)} 
+            className="btn" 
+            style={{ padding: '10px', borderRadius: '50%', background: 'white', minWidth: '44px' }}
+          >
+            <ChevronLeft size={24} />
+          </motion.button>
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--text-light)', fontWeight: 600, textTransform: 'uppercase' }}>
+              第{meetingNumber}回 家族会議 ({meetingPeriod}) • ステップ {step + 1} / 4
+            </div>
+            <h2 style={{ fontSize: '22px', fontWeight: 800 }}>{currentStage.title}</h2>
           </div>
-          <h2 style={{ fontSize: '22px', fontWeight: 800 }}>{currentStage.title}</h2>
         </div>
+
+        {/* 手動更新ボタン */}
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={() => fetchData(false)}
+          disabled={loading}
+          className="btn"
+          style={{ 
+            padding: '10px', 
+            borderRadius: '14px', 
+            background: 'white', 
+            minWidth: '44px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+          }}
+          title="データを更新"
+        >
+          {loading ? (
+            <Loader2 className="animate-spin" size={20} color="var(--primary)" />
+          ) : (
+            <RefreshCw size={20} color="var(--text-light)" />
+          )}
+        </motion.button>
       </header>
 
       {/* プログレスバー */}
@@ -269,10 +314,10 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
             {/* ステージ1: 先週の振り返り */}
             {step === 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {goals.filter(g => g.date !== new Date().toISOString().split('T')[0]).length === 0 ? (
+                {goals.filter(g => g.date === startDate).length === 0 ? (
                   <EmptyState message="振り返る目標がありません 🎯" />
                 ) : (
-                  goals.filter(g => g.date !== new Date().toISOString().split('T')[0]).map(goal => (
+                  goals.filter(g => g.date === startDate).map(goal => (
                     <div key={goal.id} className="glass-card" style={{ background: 'white', padding: '20px' }}>
                       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
                         <Target size={24} color="var(--primary)" style={{ flexShrink: 0 }} />

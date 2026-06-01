@@ -1,9 +1,13 @@
 import { getThisWeekItems, createItem } from '@/lib/notion';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request) {
   try {
-    const items = await getThisWeekItems();
+    const { searchParams } = new URL(request.url);
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+
+    const items = await getThisWeekItems({ startDate, endDate });
     return NextResponse.json(items);
   } catch (error) {
     console.error('Notion API Error:', error);

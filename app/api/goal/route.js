@@ -1,9 +1,13 @@
 import { getCurrentGoals, createGoal } from '@/lib/notion';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request) {
   try {
-    const goals = await getCurrentGoals();
+    const { searchParams } = new URL(request.url);
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+
+    const goals = await getCurrentGoals({ startDate, endDate });
     return NextResponse.json(goals || []);
   } catch (error) {
     console.error('Notion API Error:', error);
