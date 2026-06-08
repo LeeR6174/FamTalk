@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, CheckCircle, Target, MessageSquare, Heart, Zap, Save, Loader2, Plus, Trash2, PartyPopper, RefreshCw } from 'lucide-react';
+import { calculateMeetingCount, getMeetingDates } from '@/lib/dateUtils';
 
 const STAGES = [
   { id: 'review', title: '先週の振り返り', icon: <Target size={20} /> },
@@ -20,24 +21,12 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
   const [isFinished, setIsFinished] = useState(false);
   const [showCutIn, setShowCutIn] = useState(true);
 
-  const calculateMeetingCount = useCallback(() => {
-    const baselineDate = new Date('2026-05-09');
-    const baselineCount = 63;
-    const today = new Date();
-    const diffTime = today - baselineDate;
-    const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
-    return baselineCount + diffWeeks - meetingOffset;
-  }, [meetingOffset]);
-
-  const meetingNumber = calculateMeetingCount();
+  const meetingNumber = calculateMeetingCount(meetingOffset);
 
   const getMeetingPeriod = useCallback((number) => {
-    const baselineDate = new Date('2026-05-09');
-    const baselineCount = 63;
-    const offsetWeeks = number - baselineCount;
-    const meetingDate = new Date(baselineDate.getTime() + offsetWeeks * 7 * 24 * 60 * 60 * 1000);
-    const startDate = new Date(meetingDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const endDate = new Date(meetingDate.getTime() - 1 * 24 * 60 * 60 * 1000);
+    const { startDate, endDate } = getMeetingDates(number);
+    const startD = new Date(startDate);
+    const endD = new Date(endDate);
     
     const formatDate = (d) => {
       const month = d.getMonth() + 1;
@@ -46,29 +35,12 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
       return `${month}/${date}(${dayOfWeek})`;
     };
     
-    return `${formatDate(startDate)} 〜 ${formatDate(endDate)}`;
+    return `${formatDate(startD)} 〜 ${formatDate(endD)}`;
   }, []);
 
   const meetingPeriod = getMeetingPeriod(meetingNumber);
 
-  const getMeetingQueryDates = useCallback(() => {
-    const toISODate = (d) => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const date = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${date}`;
-    };
-
-    const end = new Date(Date.now() - meetingOffset * 7 * 24 * 60 * 60 * 1000);
-    const start = new Date(Date.now() - (meetingOffset + 1) * 7 * 24 * 60 * 60 * 1000);
-
-    return {
-      startDate: toISODate(start),
-      endDate: toISODate(end)
-    };
-  }, [meetingOffset]);
-
-  const { startDate, endDate } = getMeetingQueryDates();
+  const { startDate, endDate } = getMeetingDates(meetingNumber);
 
   const fetchData = useCallback(async (silent = false) => {
     // 入力中はバックグラウンド更新をスキップ（カーソル飛び防止）
@@ -81,7 +53,6 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
 
     if (!silent) setLoading(true);
     try {
-      const { startDate, endDate } = getMeetingQueryDates();
       const [itemsRes, goalRes] = await Promise.all([
         fetch(`/api/items?startDate=${startDate}&endDate=${endDate}`),
         fetch(`/api/goal?startDate=${startDate}&endDate=${endDate}`),
@@ -95,7 +66,7 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [getMeetingQueryDates]);
+  }, [startDate, endDate]);
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -149,7 +120,7 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
     
     setLoading(true);
     try {
-      const goalDate = new Date(Date.now() - meetingOffset * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const goalDate = getMeetingDates(meetingNumber + 1).startDate;
       await Promise.all(validGoals.map(content => 
         fetch('/api/goal', {
           method: 'POST',
@@ -312,35 +283,41 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
             transition={{ duration: 0.3 }}
           >
             {/* ステージ1: 先週の振り返り */}
-            {step === 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {goals.filter(g => g.date === startDate).length === 0 ? (
-                  <EmptyState message="振り返る目標がありません 🎯" />
-                ) : (
-                  goals.filter(g => g.date === startDate).map(goal => (
-                    <div key={goal.id} className="glass-card" style={{ background: 'white', padding: '20px' }}>
-                      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-                        <Target size={24} color="var(--primary)" style={{ flexShrink: 0 }} />
-                        <h4 style={{ fontSize: '18px', fontWeight: 800 }}>{goal.content}</h4>
-                      </div>
-                      <div style={{ borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '16px' }}>
-                        <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-light)', marginBottom: '8px' }}>達成度・振り返り</p>
-                        <textarea 
-                          className="input" 
-                          style={{ height: '80px', fontSize: '14px', background: 'rgba(0,0,0,0.02)', padding: '12px' }}
-                          placeholder="できたこと、できなかったことを記入..."
-                          defaultValue={goal.answer}
-                          onBlur={(e) => handleUpdateAnswer(goal.id, e.target.value, true)}
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px', color: 'var(--accent)' }}>
-                          {savingId === goal.id ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} opacity={0.3} />}
+            {step === 0 && (() => {
+              const prevDay = new Date(new Date(startDate).getTime() - 24 * 60 * 60 * 1000);
+              const prevDayStr = `${prevDay.getFullYear()}-${String(prevDay.getMonth() + 1).padStart(2, '0')}-${String(prevDay.getDate()).padStart(2, '0')}`;
+              const filteredGoals = goals.filter(g => g.date === startDate || g.date === prevDayStr);
+              
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {filteredGoals.length === 0 ? (
+                    <EmptyState message="振り返る目標がありません 🎯" />
+                  ) : (
+                    filteredGoals.map(goal => (
+                      <div key={goal.id} className="glass-card" style={{ background: 'white', padding: '20px' }}>
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+                          <Target size={24} color="var(--primary)" style={{ flexShrink: 0 }} />
+                          <h4 style={{ fontSize: '18px', fontWeight: 800 }}>{goal.content}</h4>
+                        </div>
+                        <div style={{ borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '16px' }}>
+                          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-light)', marginBottom: '8px' }}>達成度・振り返り</p>
+                          <textarea 
+                            className="input" 
+                            style={{ height: '80px', fontSize: '14px', background: 'rgba(0,0,0,0.02)', padding: '12px' }}
+                            placeholder="できたこと、できなかったことを記入..."
+                            defaultValue={goal.answer}
+                            onBlur={(e) => handleUpdateAnswer(goal.id, e.target.value, true)}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px', color: 'var(--accent)' }}>
+                            {savingId === goal.id ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} opacity={0.3} />}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
+                    ))
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ステージ2: 来週の目標 */}
             {step === 1 && (
@@ -380,7 +357,7 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
                 <AddMeetingItemForm 
                   type="改善" 
                   user={user} 
-                  meetingOffset={meetingOffset} 
+                  meetingNumber={meetingNumber} 
                   onItemAdded={(newItem) => setItems(prev => [...prev, newItem])} 
                 />
                 {items.filter(i => i.type === '改善').length === 0 ? (
@@ -399,7 +376,7 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
                 <AddMeetingItemForm 
                   type="ホメ" 
                   user={user} 
-                  meetingOffset={meetingOffset} 
+                  meetingNumber={meetingNumber} 
                   onItemAdded={(newItem) => setItems(prev => [...prev, newItem])} 
                 />
                 {items.filter(i => i.type === 'ホメ').length === 0 ? (
@@ -440,7 +417,7 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
   );
 }
 
-const AddMeetingItemForm = memo(({ type, user, meetingOffset, onItemAdded }) => {
+const AddMeetingItemForm = memo(({ type, user, meetingNumber, onItemAdded }) => {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const to = user === 'あき' ? 'ゆうき' : 'あき';
@@ -451,7 +428,7 @@ const AddMeetingItemForm = memo(({ type, user, meetingOffset, onItemAdded }) => 
 
     setLoading(true);
     try {
-      const itemDate = new Date(Date.now() - meetingOffset * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const { endDate: itemDate } = getMeetingDates(meetingNumber);
       const res = await fetch('/api/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

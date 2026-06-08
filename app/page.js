@@ -6,18 +6,20 @@ import MeetingView from '@/components/MeetingView';
 import Settings from '@/components/Settings';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Target, Settings as SettingsIcon, LogOut, Loader2 } from 'lucide-react';
+import { calculateMeetingCount, getMeetingDates } from '@/lib/dateUtils';
 
 export default function Home() {
   const [user, setUser] = useState(null);
   const [isMeetingMode, setIsMeetingMode] = useState(false);
   const [prevMeetingMode, setPrevMeetingMode] = useState(false);
-  const [meetingDay, setMeetingDay] = useState(6); // Default Saturday
   const [devMode, setDevMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [currentGoal, setCurrentGoal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
   const [meetingOffset, setMeetingOffset] = useState(0);
+
+  const meetingDay = 0; // Hardcoded Sunday (0)
 
   const fetchGoal = useCallback(async () => {
     try {
@@ -34,12 +36,10 @@ export default function Home() {
   useEffect(() => {
     // Load config from LocalStorage
     const savedUser = localStorage.getItem('famtalk_user');
-    const savedDay = localStorage.getItem('famtalk_meeting_day');
     const savedDevMode = localStorage.getItem('famtalk_dev_mode');
 
     Promise.resolve().then(() => {
       if (savedUser) setUser(savedUser);
-      if (savedDay !== null) setMeetingDay(parseInt(savedDay));
       if (savedDevMode === 'true') setDevMode(true);
       setIsConfigLoaded(true);
       fetchGoal();
@@ -49,10 +49,9 @@ export default function Home() {
   // Save config when changed
   useEffect(() => {
     if (isConfigLoaded) {
-      localStorage.setItem('famtalk_meeting_day', meetingDay);
       localStorage.setItem('famtalk_dev_mode', devMode);
     }
-  }, [meetingDay, devMode, isConfigLoaded]);
+  }, [devMode, isConfigLoaded]);
 
   // 会議終了後に目標を再取得
   useEffect(() => {
@@ -78,6 +77,15 @@ export default function Home() {
 
   const today = new Date().getDay();
   const isMeetingOpen = devMode || today === meetingDay;
+
+  const formatPeriodStr = (offset) => {
+    const num = calculateMeetingCount(offset);
+    const { startDate, endDate } = getMeetingDates(num);
+    const startD = new Date(startDate);
+    const endD = new Date(endDate);
+    const formatDate = (d) => `${d.getMonth() + 1}/${d.getDate()}(${['日', '月', '火', '水', '木', '金', '土'][d.getDay()]})`;
+    return `第${num}回: ${formatDate(startD)} 〜 ${formatDate(endD)}`;
+  };
 
   if (!isConfigLoaded) return null;
 
@@ -179,93 +187,116 @@ export default function Home() {
       {/* クイック投稿 */}
       <QuickPost user={user} onPost={() => {}} />
 
-      {/* 家族会議ボタン */}
-      <div style={{ marginTop: '32px' }}>
-        <AnimatePresence>
-          {isMeetingOpen ? (
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="floating"
-            >
-              <button 
-                className="btn btn-primary" 
-                style={{ 
-                  width: '100%', 
-                  padding: '24px', 
-                  borderRadius: '24px', 
-                  fontSize: '20px', 
-                  fontWeight: 800,
-                  background: 'linear-gradient(135deg, var(--primary), #ec407a)',
-                  boxShadow: '0 15px 35px rgba(244, 143, 177, 0.4)'
-                }}
-                onClick={() => {
-                  setMeetingOffset(0);
-                  setIsMeetingMode(true);
-                }}
-              >
-                家族会議をはじめる 🚀
-              </button>
-              <button 
-                className="btn" 
-                style={{ 
-                  width: '100%', 
-                  marginTop: '12px',
-                  padding: '14px', 
-                  borderRadius: '18px', 
-                  fontSize: '14px', 
-                  fontWeight: 700,
-                  background: 'rgba(0,0,0,0.05)',
-                  color: 'var(--text-light)',
-                  boxShadow: 'none'
-                }}
-                onClick={() => {
-                  setMeetingOffset(1);
-                  setIsMeetingMode(true);
-                }}
-              >
-                前回の分の会議を行う ⏳
-              </button>
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+      {/* 家族会議ダッシュボード */}
+      <div style={{ marginTop: '36px' }}>
+        <h3 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: 800, color: 'var(--text-dark)' }}>
+          家族会議 🛋️
+        </h3>
+        
+        <div className="glass-card" style={{ padding: '24px', background: 'white', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* 今週の会議 (Primary Action) */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-dark)' }}>今週の会議</span>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: '8px' }}>
+                {today === meetingDay ? '本日開催日！' : '日曜日開催'}
+              </span>
+            </div>
+            <button 
+              className="btn btn-primary" 
               style={{ 
-                textAlign: 'center', 
-                padding: '24px', 
-                borderRadius: '24px',
-                background: 'rgba(0,0,0,0.03)',
-                color: 'var(--text-light)', 
-                fontSize: '15px',
-                fontWeight: 500,
-                border: '2px dashed rgba(0,0,0,0.05)'
+                width: '100%', 
+                padding: '18px', 
+                borderRadius: '16px', 
+                fontSize: '17px', 
+                fontWeight: 800,
+                background: today === meetingDay 
+                  ? 'linear-gradient(135deg, var(--primary), #ec407a)' 
+                  : 'linear-gradient(135deg, #8e24aa, var(--primary))',
+                boxShadow: '0 8px 25px rgba(233, 30, 99, 0.25)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              onClick={() => {
+                setMeetingOffset(0);
+                setIsMeetingMode(true);
               }}
             >
-              次の会議は {['日', '月', '火', '水', '木', '金', '土'][meetingDay]}曜日 です 🛋️
-              <button 
-                className="btn btn-secondary" 
-                style={{ 
-                  width: '100%', 
-                  marginTop: '16px',
-                  padding: '16px', 
-                  borderRadius: '18px', 
-                  fontSize: '16px', 
-                  fontWeight: 800,
-                  background: 'linear-gradient(135deg, var(--secondary), #42a5f5)',
-                  boxShadow: '0 8px 20px rgba(144, 202, 249, 0.3)'
-                }}
-                onClick={() => {
-                  setMeetingOffset(1);
-                  setIsMeetingMode(true);
-                }}
-              >
-                前回の分の会議を行う ⏳
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>家族会議をはじめる 🚀</span>
+              </div>
+              <span style={{ fontSize: '12px', opacity: 0.9, fontWeight: 500 }}>
+                {formatPeriodStr(0)}
+              </span>
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '4px' }}>
+            {/* 前回の会議 */}
+            <button 
+              className="btn" 
+              style={{ 
+                padding: '14px 10px', 
+                borderRadius: '14px', 
+                fontSize: '13px', 
+                fontWeight: 700,
+                background: 'rgba(0,0,0,0.03)',
+                color: 'var(--text-dark)',
+                boxShadow: 'none',
+                border: '1px solid rgba(0,0,0,0.05)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                textAlign: 'center',
+                height: 'auto'
+              }}
+              onClick={() => {
+                setMeetingOffset(1);
+                setIsMeetingMode(true);
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>前回の会議を行う ⏳</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-light)', fontWeight: 500 }}>
+                {formatPeriodStr(1).split(': ')[1]}
+              </span>
+            </button>
+
+            {/* 次回の会議を先に行う */}
+            <button 
+              className="btn" 
+              style={{ 
+                padding: '14px 10px', 
+                borderRadius: '14px', 
+                fontSize: '13px', 
+                fontWeight: 700,
+                background: 'rgba(0,0,0,0.03)',
+                color: 'var(--text-dark)',
+                boxShadow: 'none',
+                border: '1px solid rgba(0,0,0,0.05)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                textAlign: 'center',
+                height: 'auto'
+              }}
+              onClick={() => {
+                setMeetingOffset(-1);
+                setIsMeetingMode(true);
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>次回の会議を先に行う 🗓️</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-light)', fontWeight: 500 }}>
+                {formatPeriodStr(-1).split(': ')[1]}
+              </span>
+            </button>
+          </div>
+
+        </div>
       </div>
 
       <AnimatePresence>
@@ -273,8 +304,6 @@ export default function Home() {
           <Settings 
             onClose={() => setShowSettings(false)}
             user={user}
-            meetingDay={meetingDay}
-            setMeetingDay={setMeetingDay}
             devMode={devMode}
             setDevMode={setDevMode}
           />

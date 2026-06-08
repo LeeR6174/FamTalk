@@ -1,10 +1,8 @@
 'use client';
 import { motion } from 'framer-motion';
-import { X, Calendar, Bug, Info } from 'lucide-react';
+import { X, Bug, Info } from 'lucide-react';
 
-const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
-
-export default function Settings({ onClose, user, meetingDay, setMeetingDay, devMode, setDevMode }) {
+export default function Settings({ onClose, user, devMode, setDevMode }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -43,37 +41,7 @@ export default function Settings({ onClose, user, meetingDay, setMeetingDay, dev
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* 家族会議の曜日 */}
-          <div>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-light)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar size={16} /> 家族会議の日
-            </label>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {DAYS.map((day, index) => (
-                <button
-                  key={day}
-                  onClick={() => setMeetingDay(index)}
-                  style={{
-                    flex: 1,
-                    minWidth: '40px',
-                    padding: '10px 0',
-                    borderRadius: '12px',
-                    border: '2px solid transparent',
-                    background: meetingDay === index ? 'var(--primary)' : 'rgba(0,0,0,0.05)',
-                    color: meetingDay === index ? 'white' : 'var(--text-dark)',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {day}
-                </button>
-              ))}
-            </div>
-            <p style={{ fontSize: '12px', color: 'var(--text-light)', marginTop: '8px' }}>
-              選択した曜日になると「家族会議モード」がオープンします。
-            </p>
-          </div>
+
 
           {/* デベロッパーモード */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(0,0,0,0.03)', borderRadius: '16px' }}>
