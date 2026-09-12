@@ -18,8 +18,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
   const [meetingOffset, setMeetingOffset] = useState(0);
-
-  const meetingDay = 0; // Hardcoded Sunday (0)
+  const [meetingDay, setMeetingDay] = useState(0);
 
   const fetchGoal = useCallback(async () => {
     try {
@@ -37,10 +36,12 @@ export default function Home() {
     // Load config from LocalStorage
     const savedUser = localStorage.getItem('famtalk_user');
     const savedDevMode = localStorage.getItem('famtalk_dev_mode');
+    const savedMeetingDay = localStorage.getItem('famtalk_meeting_day');
 
     Promise.resolve().then(() => {
       if (savedUser) setUser(savedUser);
       if (savedDevMode === 'true') setDevMode(true);
+      if (savedMeetingDay !== null) setMeetingDay(Number(savedMeetingDay));
       setIsConfigLoaded(true);
       fetchGoal();
     });
@@ -52,6 +53,12 @@ export default function Home() {
       localStorage.setItem('famtalk_dev_mode', devMode);
     }
   }, [devMode, isConfigLoaded]);
+
+  useEffect(() => {
+    if (isConfigLoaded) {
+      localStorage.setItem('famtalk_meeting_day', String(meetingDay));
+    }
+  }, [meetingDay, isConfigLoaded]);
 
   // 会議終了後に目標を再取得
   useEffect(() => {
@@ -200,7 +207,7 @@ export default function Home() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-dark)' }}>今週の会議</span>
               <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: '8px' }}>
-                {today === meetingDay ? '本日開催日！' : '日曜日開催'}
+                {today === meetingDay ? '本日開催日！' : `${['日', '月', '火', '水', '木', '金', '土'][meetingDay]}曜日開催`}
               </span>
             </div>
             <button 
@@ -306,6 +313,8 @@ export default function Home() {
             user={user}
             devMode={devMode}
             setDevMode={setDevMode}
+            meetingDay={meetingDay}
+            setMeetingDay={setMeetingDay}
           />
         )}
       </AnimatePresence>

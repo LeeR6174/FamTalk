@@ -1,14 +1,26 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Heart, Zap, CheckCircle2 } from 'lucide-react';
+import { flushOfflineQueue, requestWithOfflineQueue } from '@/lib/offlineQueue';
 
 export default function QuickPost({ user, onPost }) {
-  const [content, setContent] = useState('');
+  const draftKey = `famtalk_quick_post_${user}`;
+  const [content, setContent] = useState(() => (
+    typeof window === 'undefined' ? '' : localStorage.getItem(draftKey) || ''
+  ));
   const [type, setType] = useState('ホメ');
   const [to, setTo] = useState(user === 'あき' ? 'ゆうき' : 'あき');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [queued, setQueued] = useState(false);
+
+  useEffect(() => {
+    flushOfflineQueue().catch(error => console.error(error));
+    const handleOnline = () => flushOfflineQueue().catch(error => console.error(error));
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [draftKey]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,13 +28,15 @@ export default function QuickPost({ user, onPost }) {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/items', {
+      const { response, queued } = await requestWithOfflineQueue('/api/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, type, from: user, to }),
       });
-      if (res.ok) {
+      if (queued || response?.ok) {
         setContent('');
+        localStorage.removeItem(draftKey);
+        setQueued(queued);
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
         if (onPost) onPost();
@@ -63,7 +77,7 @@ export default function QuickPost({ user, onPost }) {
             }}
           >
             <CheckCircle2 size={48} />
-            <span style={{ fontWeight: 700, fontSize: '18px', color: 'var(--text-dark)' }}>送信しました！</span>
+            <span style={{ fontWeight: 700, fontSize: '18px', color: 'var(--text-dark)' }}>{queued ? '通信復旧後に送信します' : '送信しました！'}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -98,7 +112,10 @@ export default function QuickPost({ user, onPost }) {
           style={{ height: '140px', marginBottom: '20px', resize: 'none', background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(0,0,0,0.05)' }}
           placeholder={`${to}へのメッセージを入力...`}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={(e) => {
+            setContent(e.target.value);
+            localStorage.setItem(draftKey, e.target.value);
+          }}
         />
 
         <button 

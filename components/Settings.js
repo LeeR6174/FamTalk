@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { X, Bug, Info } from 'lucide-react';
 
-export default function Settings({ onClose, user, devMode, setDevMode }) {
+export default function Settings({ onClose, user, devMode, setDevMode, meetingDay, setMeetingDay }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -42,6 +42,22 @@ export default function Settings({ onClose, user, devMode, setDevMode }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', padding: '16px', background: 'rgba(0,0,0,0.03)', borderRadius: '16px' }}>
+            <div>
+              <div style={{ fontWeight: 600 }}>家族会議の曜日</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>二人の都合に合わせて変更できます</div>
+            </div>
+            <select
+              value={meetingDay}
+              onChange={(e) => setMeetingDay(Number(e.target.value))}
+              className="input"
+              style={{ width: '96px', padding: '10px 8px', background: 'white' }}
+            >
+              {['日', '月', '火', '水', '木', '金', '土'].map((day, index) => (
+                <option key={day} value={index}>{day}曜日</option>
+              ))}
+            </select>
+          </div>
 
           {/* デベロッパーモード */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(0,0,0,0.03)', borderRadius: '16px' }}>

@@ -18,7 +18,10 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const result = await createItem(body);
+    if (!body.content?.trim() || !body.type || !body.from || !body.to) {
+      return NextResponse.json({ error: 'Item content, type, from and to are required' }, { status: 400 });
+    }
+    const result = await createItem({ ...body, content: body.content.trim() });
     return NextResponse.json(result);
   } catch (error) {
     console.error('Notion API Error:', error);

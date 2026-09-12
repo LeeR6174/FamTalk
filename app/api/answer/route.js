@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server';
 export async function POST(request) {
   try {
     const body = await request.json();
+    if (!body.id || typeof body.answer !== 'string') {
+      return NextResponse.json({ error: 'Answer target and text are required' }, { status: 400 });
+    }
     const result = await updateAnswer(body.id, body.answer);
     return NextResponse.json(result);
   } catch (error) {

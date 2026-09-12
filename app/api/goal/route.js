@@ -1,4 +1,4 @@
-import { getCurrentGoals, createGoal } from '@/lib/notion';
+import { getCurrentGoals, createGoal, updateGoal } from '@/lib/notion';
 import { NextResponse } from 'next/server';
 
 export async function GET(request) {
@@ -18,8 +18,11 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
+    if (!body.content?.trim()) {
+      return NextResponse.json({ error: 'Goal content is required' }, { status: 400 });
+    }
     const result = await createGoal({ 
-      content: body.content, 
+      content: body.content.trim(),
       from: body.user || 'Unknown',
       date: body.date
     });
@@ -27,5 +30,19 @@ export async function POST(request) {
   } catch (error) {
     console.error('Notion API Error:', error);
     return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request) {
+  try {
+    const body = await request.json();
+    if (!body.id || !body.content?.trim()) {
+      return NextResponse.json({ error: 'Goal id and content are required' }, { status: 400 });
+    }
+    const result = await updateGoal(body.id, body.content.trim());
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('Notion API Error:', error);
+    return NextResponse.json({ error: 'Failed to update goal' }, { status: 500 });
   }
 }

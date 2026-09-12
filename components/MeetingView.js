@@ -1,8 +1,9 @@
 'use client';
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, CheckCircle, Target, MessageSquare, Heart, Zap, Save, Loader2, Plus, Trash2, PartyPopper, RefreshCw } from 'lucide-react';
 import { calculateMeetingCount, getMeetingDates } from '@/lib/dateUtils';
+import { flushOfflineQueue, requestWithOfflineQueue } from '@/lib/offlineQueue';
 
 const STAGES = [
   { id: 'review', title: '先週の振り返り', icon: <Target size={20} /> },
@@ -15,13 +16,17 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
   const [step, setStep] = useState(0);
   const [items, setItems] = useState([]);
   const [goals, setGoals] = useState([]);
-  const [nextGoals, setNextGoals] = useState(['']);
+  const [nextGoals, setNextGoals] = useState([{ id: null, content: '' }]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [isFinished, setIsFinished] = useState(false);
   const [showCutIn, setShowCutIn] = useState(true);
+  const [saveMessage, setSaveMessage] = useState('');
 
   const meetingNumber = calculateMeetingCount(meetingOffset);
+  const nextGoalDate = getMeetingDates(meetingNumber + 1).startDate;
+  const draftKey = `famtalk_goal_draft_${user}_${meetingNumber}`;
+  const nextGoalsLoaded = useRef(false);
 
   const getMeetingPeriod = useCallback((number) => {
     const { startDate, endDate } = getMeetingDates(number);
@@ -53,22 +58,45 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
 
     if (!silent) setLoading(true);
     try {
-      const [itemsRes, goalRes] = await Promise.all([
+      const [itemsRes, goalRes, nextGoalRes] = await Promise.all([
         fetch(`/api/items?startDate=${startDate}&endDate=${endDate}`),
         fetch(`/api/goal?startDate=${startDate}&endDate=${endDate}`),
+        fetch(`/api/goal?startDate=${nextGoalDate}&endDate=${nextGoalDate}`),
       ]);
       const itemsData = await itemsRes.json();
       const goalData = await goalRes.json();
+      const nextGoalData = await nextGoalRes.json();
       setItems(Array.isArray(itemsData) ? itemsData : []);
       setGoals(Array.isArray(goalData) ? goalData : []);
+      if (!nextGoalsLoaded.current) {
+        let savedDraft = [];
+        try {
+          const parsedDraft = JSON.parse(localStorage.getItem(draftKey) || '[]');
+          savedDraft = Array.isArray(parsedDraft) ? parsedDraft : [];
+        } catch {
+          localStorage.removeItem(draftKey);
+        }
+        const savedItems = Array.isArray(savedDraft)
+          ? savedDraft.filter(goal => !goal.id && goal.content?.trim())
+          : [];
+        const existingGoals = Array.isArray(nextGoalData)
+          ? nextGoalData.map(goal => ({ id: goal.id, content: goal.content }))
+          : [];
+        const loadedGoals = [...existingGoals, ...savedItems, { id: null, content: '' }];
+        setNextGoals(loadedGoals);
+        nextGoalsLoaded.current = true;
+      }
     } catch (error) {
       console.error(error);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, nextGoalDate, draftKey]);
 
   useEffect(() => {
+    flushOfflineQueue().catch(error => console.error(error));
+    const handleOnline = () => flushOfflineQueue().catch(error => console.error(error));
+    window.addEventListener('online', handleOnline);
     Promise.resolve().then(() => {
       fetchData();
     });
@@ -80,39 +108,77 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
 
     return () => {
       clearTimeout(cutInTimer);
+      window.removeEventListener('online', handleOnline);
     };
   }, [fetchData]);
 
   const handleUpdateAnswer = async (id, answer, isGoal = false) => {
     setSavingId(id);
     try {
-      await fetch('/api/answer', {
+      const { response, queued } = await requestWithOfflineQueue('/api/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, answer }),
       });
+      if (!queued && !response?.ok) throw new Error('回答の保存に失敗しました');
+      setSaveMessage(queued ? '通信復旧後に回答を送信します' : '保存しました');
       if (isGoal) {
         setGoals(prev => prev.map(g => g.id === id ? { ...g, answer } : g));
       } else {
         setItems(prev => prev.map(item => item.id === id ? { ...item, answer } : item));
       }
+      return queued;
     } catch (error) {
       console.error(error);
+      return false;
     } finally {
       setTimeout(() => setSavingId(null), 800);
     }
   };
 
-  const handleAddNextGoal = () => setNextGoals([...nextGoals, '']);
-  const handleRemoveNextGoal = (index) => setNextGoals(nextGoals.filter((_, i) => i !== index));
+  const persistGoalDraft = (updatedGoals) => {
+    localStorage.setItem(draftKey, JSON.stringify(updatedGoals.filter(goal => !goal.id && goal.content.trim())));
+  };
+
+  const handleAddNextGoal = () => setNextGoals([...nextGoals, { id: null, content: '' }]);
+  const handleRemoveNextGoal = (index) => {
+    const updatedGoals = nextGoals.filter((_, i) => i !== index);
+    setNextGoals(updatedGoals);
+    persistGoalDraft(updatedGoals);
+  };
   const handleNextGoalChange = (index, value) => {
     const updated = [...nextGoals];
-    updated[index] = value;
+    updated[index] = { ...updated[index], content: value };
     setNextGoals(updated);
+    persistGoalDraft(updated);
+  };
+
+  const saveNextGoal = async (index) => {
+    const goal = nextGoals[index];
+    if (!goal?.content.trim()) return;
+
+    const options = {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(goal.id
+        ? { id: goal.id, content: goal.content }
+        : { content: goal.content, user, date: nextGoalDate }),
+    };
+    const { response, queued } = await requestWithOfflineQueue('/api/goal', {
+      method: goal.id ? 'PATCH' : 'POST',
+      ...options,
+    });
+    if (!queued && !response?.ok) throw new Error('目標の保存に失敗しました');
+    const data = queued ? null : await response.json();
+    const updated = nextGoals.map((item, itemIndex) => itemIndex === index
+      ? { ...item, id: item.id || data?.id }
+      : item);
+    setNextGoals(updated);
+    persistGoalDraft(updated);
+    setSaveMessage(queued ? '通信復旧後に目標を送信します' : '目標を保存しました');
   };
 
   const handleSaveAllGoals = async () => {
-    const validGoals = nextGoals.filter(g => g.trim() !== '');
+    const validGoals = nextGoals.filter(g => g.content.trim() !== '');
     if (validGoals.length === 0) {
       setIsFinished(true);
       return;
@@ -120,14 +186,7 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
     
     setLoading(true);
     try {
-      const goalDate = getMeetingDates(meetingNumber + 1).startDate;
-      await Promise.all(validGoals.map(content => 
-        fetch('/api/goal', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, user, date: goalDate }),
-        })
-      ));
+      await Promise.all(validGoals.map((goal) => saveNextGoal(nextGoals.indexOf(goal))));
       setIsFinished(true);
     } catch (error) {
       console.error(error);
@@ -257,6 +316,12 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
         </motion.button>
       </header>
 
+          {saveMessage && (
+            <p style={{ margin: '-16px 0 16px', color: 'var(--accent)', fontSize: '13px', fontWeight: 600 }}>
+              {saveMessage}
+            </p>
+          )}
+
       {/* プログレスバー */}
       <div style={{ display: 'flex', gap: '4px', marginBottom: '32px' }}>
         {STAGES.map((_, i) => (
@@ -328,8 +393,9 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
                     <input 
                       className="input"
                       placeholder={`来週の目標 ${idx + 1}...`}
-                      value={goal}
+                      value={goal.content}
                       onChange={(e) => handleNextGoalChange(idx, e.target.value)}
+                      onBlur={() => saveNextGoal(idx).catch(error => console.error(error))}
                     />
                     {nextGoals.length > 1 && (
                       <button 
@@ -418,9 +484,12 @@ export default function MeetingView({ onBack, user, meetingOffset = 0 }) {
 }
 
 const AddMeetingItemForm = memo(({ type, user, meetingNumber, onItemAdded }) => {
-  const [content, setContent] = useState('');
-  const [loading, setLoading] = useState(false);
   const to = user === 'あき' ? 'ゆうき' : 'あき';
+  const draftKey = `famtalk_meeting_item_${user}_${meetingNumber}_${type}`;
+  const [content, setContent] = useState(() => (
+    typeof window === 'undefined' ? '' : localStorage.getItem(draftKey) || ''
+  ));
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -429,24 +498,27 @@ const AddMeetingItemForm = memo(({ type, user, meetingNumber, onItemAdded }) => 
     setLoading(true);
     try {
       const { endDate: itemDate } = getMeetingDates(meetingNumber);
-      const res = await fetch('/api/items', {
+      const { response, queued } = await requestWithOfflineQueue('/api/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, type, from: user, to, date: itemDate }),
       });
-      if (res.ok) {
-        const data = await res.json();
+      if (queued || response?.ok) {
+        const data = queued ? {} : await response.json();
         setContent('');
-        const newItem = {
-          id: data.id,
-          content: content,
-          type: type,
-          from: user,
-          to: to,
-          date: itemDate,
-          answer: ''
-        };
-        onItemAdded(newItem);
+        localStorage.removeItem(draftKey);
+        if (!queued) {
+          onItemAdded({
+            id: data.id,
+            content,
+            type,
+            from: user,
+            to,
+            date: itemDate,
+            answer: ''
+          });
+        }
+        alert(queued ? '通信復旧後に送信します。' : '追加しました。');
       } else {
         alert('追加に失敗しました。');
       }
@@ -454,7 +526,6 @@ const AddMeetingItemForm = memo(({ type, user, meetingNumber, onItemAdded }) => 
       console.error(error);
       alert('エラーが発生しました。');
     } finally {
-      setContent('');
       setLoading(false);
     }
   };
@@ -470,7 +541,10 @@ const AddMeetingItemForm = memo(({ type, user, meetingNumber, onItemAdded }) => 
           style={{ padding: '10px 14px', fontSize: '14px', flex: 1, borderRadius: '12px', background: 'white' }}
           placeholder={`${to}への${type}...`}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={(e) => {
+            setContent(e.target.value);
+            localStorage.setItem(draftKey, e.target.value);
+          }}
         />
         <button
           type="submit"
@@ -486,6 +560,16 @@ const AddMeetingItemForm = memo(({ type, user, meetingNumber, onItemAdded }) => 
 });
 
 const ItemCard = memo(({ item, onUpdate, savingId }) => {
+  const draftKey = `famtalk_answer_${item.id}`;
+  const [answer, setAnswer] = useState(() => (
+    typeof window === 'undefined' ? item.answer || '' : localStorage.getItem(draftKey) ?? item.answer ?? ''
+  ));
+
+  const handleBlur = async () => {
+    const queued = await onUpdate(item.id, answer);
+    if (!queued) localStorage.removeItem(draftKey);
+  };
+
   return (
     <div className="glass-card" style={{ padding: '20px', background: 'white' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -502,8 +586,12 @@ const ItemCard = memo(({ item, onUpdate, savingId }) => {
           className="input" 
           style={{ padding: '12px 16px', fontSize: '14px', background: 'rgba(0,0,0,0.02)' }}
           placeholder="アンサー・コメントを入力..."
-          defaultValue={item.answer}
-          onBlur={(e) => onUpdate(item.id, e.target.value)}
+          value={answer}
+          onChange={(e) => {
+            setAnswer(e.target.value);
+            localStorage.setItem(draftKey, e.target.value);
+          }}
+          onBlur={handleBlur}
         />
         <div style={{ position: 'absolute', right: '12px', bottom: '12px', color: 'var(--accent)' }}>
           {savingId === item.id ? <Loader2 className="animate-spin" size={16} /> : item.answer ? <Save size={16} opacity={0.3} /> : null}
